@@ -1,0 +1,23 @@
+# build artifacts
+build/
+out/
+
+# Visual Studio
+.vs/
+*.vcxproj*
+*.sln
+CMakeCache.txt
+CMakeFiles/
+
+# binaries
+*.exe
+*.dll
+*.lib
+*.pdb
+
+# OS
+Thumbs.db
+.DS_Store
+
+# third-party deps (download separately)
+external/
