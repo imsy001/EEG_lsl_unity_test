@@ -27,9 +27,27 @@ int main() {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    LogBuffer log;
+    LogBuffer log_rx;   // received from Unity
+    LogBuffer log_tx;   // sent from this GUI
     LSLReader reader("UnityMarkers");
+
     bool auto_scroll = true;
+
+    // LSL outlet (marker sender)
+    lsl::stream_info info(
+        "CppToUnityMarkers",   // ✅ TX stream name (different!)
+        "Markers",
+        1,
+        0,
+        lsl::cf_string,
+        "cpp_gui_sender"
+    );
+
+
+    lsl::stream_outlet outlet(info);
+    log_tx.push("[TX] Outlet advertised: name=CppToUnityMarkers type=Markers source_id=cpp_gui_sender");
+
+
 
     // ---------------- main loop ----------------
     while (!glfwWindowShouldClose(window)) {
@@ -41,13 +59,14 @@ int main() {
 
         ImGui::Begin("Unity Marker Logger");
 
-        ImGui::Text("Stream: UnityMarkers");
+        ImGui::Text("RX: UnityMarkers   |   TX: CppToUnityMarkers");
+
         ImGui::SameLine();
         ImGui::Text("| Status: %s", reader.running() ? "RUNNING" : "STOPPED");
 
         if (!reader.running()) {
             if (ImGui::Button("Connect")) {
-                reader.start(log);
+                reader.start(log_rx);
             }
         }
         else {
@@ -56,25 +75,85 @@ int main() {
             }
         }
 
-        ImGui::SameLine();
-        if (ImGui::Button("Clear"))
-            log.clear();
+        if (ImGui::Button("Clear All")) {
+            log_rx.clear();
+            log_tx.clear();
+        }
+
 
         ImGui::SameLine();
         ImGui::Checkbox("Auto-scroll", &auto_scroll);
 
-        ImGui::Separator();
+        ImGui::SeparatorText("Send Marker");
 
-        ImGui::BeginChild("log", ImVec2(0, 0), true);
-        auto lines = log.snapshot();
-        for (const auto& s : lines)
-            ImGui::TextUnformatted(s.c_str());
+        if (ImGui::Button("SPACE_DOWN (Send)", ImVec2(220, 40))) {
+            std::string sample[1];
+            sample[0] = "SPACE_DOWN";
+            outlet.push_sample(sample);
 
-        if (auto_scroll &&
-            ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 20.0f) {
-            ImGui::SetScrollHereY(1.0f);
+            log_tx.push("[TX][GUI] Sent SPACE_DOWN");
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("SPACE_UP (Send)", ImVec2(160, 40))) {
+            std::string sample[1];
+            sample[0] = "SPACE_UP";
+            outlet.push_sample(sample);
+
+            log_tx.push("[TX][GUI] Sent SPACE_UP");
+        }
+
+        ImGui::SeparatorText("Logs");
+
+        ImGui::Columns(2, "logs_cols", true);
+
+        ImGui::SameLine();
+        if (ImGui::Button("PING", ImVec2(80, 40))) {
+            std::string marker = "PING_FROM_CPP";
+            outlet.push_sample(&marker);
+            log_tx.push("[TX][GUI] Sent PING_FROM_CPP");
+        }
+
+
+        // ---------- RX LOG (Unity -> C++) ----------
+        ImGui::TextUnformatted("RX (from Unity)");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Clear##rx")) log_rx.clear();
+
+        ImGui::BeginChild("rx_log", ImVec2(0, 0), true);
+        {
+            auto lines = log_rx.snapshot();
+            for (const auto& s : lines) ImGui::TextUnformatted(s.c_str());
+        
+            if (auto_scroll &&
+                ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 20.0f) {
+                ImGui::SetScrollHereY(1.0f);
+            }
         }
         ImGui::EndChild();
+
+        ImGui::NextColumn();
+
+        // ---------- TX LOG (C++ -> Unity) ----------
+        ImGui::TextUnformatted("TX (to Unity)");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Clear##tx")) log_tx.clear();
+
+        ImGui::BeginChild("tx_log", ImVec2(0, 0), true);
+        {
+            auto lines = log_tx.snapshot();
+            for (const auto& s : lines) ImGui::TextUnformatted(s.c_str());
+        
+            if (auto_scroll &&
+                ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 20.0f) {
+                ImGui::SetScrollHereY(1.0f);
+            }
+        }
+        ImGui::EndChild();
+
+        ImGui::Columns(1);
+
 
         ImGui::End();
 

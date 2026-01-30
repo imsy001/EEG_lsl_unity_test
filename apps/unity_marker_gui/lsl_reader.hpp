@@ -2,7 +2,7 @@
 #include <atomic>
 #include <thread>
 #include <string>
-#include "lsl_c.h"
+#include "lsl_cpp.h"
 
 #include "log_buffer.hpp"
 
